@@ -2,19 +2,25 @@
 # Ploneboard transform tests
 #
 
-import unittest
-from Products.Ploneboard.tests import PloneboardTestCase
 from Products.CMFCore.utils import getToolByName
-from Products.Ploneboard.config import PLONEBOARD_TOOL
-
 from Products.CMFPlone.utils import _createObjectByType
+from Products.Ploneboard.config import PLONEBOARD_TOOL
+from Products.Ploneboard.tests import PloneboardTestCase
+from Products.Ploneboard.tests.base import IntegrationTestCase
+from plone.app.testing import TEST_USER_ID
+from plone.app.testing import setRoles
+
+import unittest
 
 
-class TestTransformRegistration(PloneboardTestCase.PloneboardTestCase):
+class TestTransformRegistration(IntegrationTestCase):
     """Test transform registration """
 
-    def afterSetUp(self):
-        self.board = _createObjectByType('Ploneboard', self.folder, 'board')
+    def setUp(self):
+        self.portal = self.layer['portal']
+        setRoles(self.portal, TEST_USER_ID, ['Manager'])
+        folder = self.portal[self.portal.invokeFactory('Folder', 'folder')]
+        self.board = _createObjectByType('Ploneboard', folder, 'board')
 
     def testDefaultRegistrations(self):
         """Check if the default registrations are present."""
@@ -45,9 +51,3 @@ class TestTransformRegistration(PloneboardTestCase.PloneboardTestCase):
         self.failIf('url_to_hyperlink' in transforms.objectIds())
         tool.unregisterTransform('safe_html')
         self.failUnless('safe_html' in transforms.objectIds())
-
-def test_suite():
-    suite = unittest.TestSuite()
-    suite.addTest(unittest.makeSuite(TestTransformRegistration))
-    return suite
-

@@ -37,7 +37,7 @@ class IRecentConversationsPortlet(IPortletDataProvider):
                           description=_(u"help_forum", default=u"Limit recent conversations to a specific forum"),
                           vocabulary="ploneboard.BoardsAndForumVocabulary",
                           required=False,
-                          default="")                    
+                          default="")
 
 
 class Assignment(base.Assignment):
@@ -66,14 +66,14 @@ class Renderer(base.Renderer):
         normalize=getUtility(IIDNormalizer).normalize
         icons=getMultiAdapter((self.context, self.request),
                                 name="plone").icons_visible()
-        
+
         query = dict(object_provides="Products.Ploneboard.interfaces.IConversation",
                         sort_on="modified",
                         sort_order="reverse",
                         sort_limit=self.data.count)
-        
+
         if self.data.forum !="":
-        
+
             result = ct(UID=self.data.forum)
             if len(result)==1:
                 #limit to specific forum
@@ -119,9 +119,8 @@ class Renderer(base.Renderer):
                 #limit to specific forum
                 return result[0].getURL()
 
-        state=getMultiAdapter((self.context, self.request),
-                                name="plone_portal_state")
-        return state.portal_url()+"/ploneboard_recent"
+        plone = getMultiAdapter((self.context, self.request), name="plone")
+        return '{0}/ploneboard_recent'.format(plone.navigationRootUrl())
 
     render = ViewPageTemplateFile("recent.pt")
 

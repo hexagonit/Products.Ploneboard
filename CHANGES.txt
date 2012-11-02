@@ -6,6 +6,8 @@ Changelog
 
 - Fixed i18n headers, added locales folder and updated pt-br translations
   [davilima6]
+- Pointed link fixed to navigation root instead of plone root.
+  [taito]
 
 3.3 (2012-09-08)
 ----------------

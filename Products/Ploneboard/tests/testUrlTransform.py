@@ -2,16 +2,18 @@
 # Comment tests
 #
 
-import unittest
-import PloneboardTestCase
 from Products.Ploneboard.transforms.url_to_hyperlink import URLToHyperlink
+
+import unittest
+
 
 class MockTransformData:
     def setData(self, value):
         self.data=value
 
 
-class TestUrlTransform(PloneboardTestCase.PloneboardTestCase):
+class TestUrlTransform(unittest.TestCase):
+
     def runTest(self, testdata):
         transform = URLToHyperlink()
         data=MockTransformData()
@@ -45,18 +47,9 @@ class TestUrlTransform(PloneboardTestCase.PloneboardTestCase):
                 ]
         self.runTest(testdata)
 
-
     def testEmail(self):
         testdata = [
                 ("test@example.com", '<a href="mailto:test@example.com">test@example.com</a>'),
                 ("<test@example.com>", "<test@example.com>"),
                 ]
         self.runTest(testdata)
-
-
-def test_suite():
-    suite = unittest.TestSuite()
-    suite.addTest(unittest.makeSuite(TestUrlTransform))
-    
-    return suite
-

@@ -1,36 +1,118 @@
+# import doctest
+# import glob
+# import os
+# import unittest
+
+# from App.Common import package_home
+# from Testing.ZopeTestCase import FunctionalDocFileSuite as Suite
+
+# from Products.Ploneboard.config import GLOBALS
+
+# # Load products
+# from Products.Ploneboard.tests.PloneboardTestCase import PloneboardFunctionalTestCase
+
+# REQUIRE_TESTBROWSER = ['MemberPostingForum.txt', 'MemberOnlyForum.txt',
+#                         'MemberEditsComment.txt', 'AdminLocksBoard.txt',
+#                         'FreeForAllForum.txt', 'ModeratedForum.txt']
+
+# OPTIONFLAGS = (doctest.ELLIPSIS | doctest.NORMALIZE_WHITESPACE)
+
+
+# def list_doctests():
+#     home = package_home(GLOBALS)
+#     return [filename for filename in
+#             glob.glob(os.path.sep.join([home, 'tests', '*.txt']))]
+
+
+# def test_suite():
+#     filenames = list_doctests()
+
+#     return unittest.TestSuite(
+#         [Suite(os.path.basename(filename),
+#                optionflags=OPTIONFLAGS,
+#                package='Products.Ploneboard.tests',
+#                test_class=PloneboardFunctionalTestCase)
+#          for filename in filenames]
+#         )
+
+from hexagonit.testing.browser import Browser
+from plone.app.testing import TEST_USER_ID
+from plone.app.testing import TEST_USER_NAME
+from plone.app.testing import TEST_USER_PASSWORD
+from plone.app.testing import setRoles
+from plone.testing import layered
+from Products.Ploneboard.tests.base import FUNCTIONAL_TESTING
+from zope.testing import renormalizing
+
 import doctest
-import glob
-import os
+import manuel.codeblock
+import manuel.doctest
+import manuel.testing
+import re
+import transaction
 import unittest
 
-from App.Common import package_home
-from Testing.ZopeTestCase import FunctionalDocFileSuite as Suite
+FLAGS = doctest.NORMALIZE_WHITESPACE | doctest.ELLIPSIS | doctest.REPORT_NDIFF | doctest.REPORT_ONLY_FIRST_FAILURE
 
-from Products.Ploneboard.config import GLOBALS
-
-# Load products
-from Products.Ploneboard.tests.PloneboardTestCase import PloneboardFunctionalTestCase
-
-REQUIRE_TESTBROWSER = ['MemberPostingForum.txt', 'MemberOnlyForum.txt', 
-                        'MemberEditsComment.txt', 'AdminLocksBoard.txt',
-                        'FreeForAllForum.txt', 'ModeratedForum.txt']
-
-OPTIONFLAGS = (doctest.ELLIPSIS | doctest.NORMALIZE_WHITESPACE)
+CHECKER = renormalizing.RENormalizing([
+    # Normalize the generated UUID values to always compare equal.
+    (re.compile(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'), '<UUID>'),
+])
 
 
-def list_doctests():
-    home = package_home(GLOBALS)
-    return [filename for filename in
-            glob.glob(os.path.sep.join([home, 'tests', '*.txt']))]
+def setUp(self):
+    layer = self.globs['layer']
+    browser = Browser(layer['app'])
+    portal = layer['portal']
+    # Update global variables within the tests.
+    self.globs.update({
+        'TEST_USER_NAME': TEST_USER_NAME,
+        'TEST_USER_PASSWORD': TEST_USER_PASSWORD,
+        'portal': portal,
+        'browser': browser,
+    })
+
+    browser.setBaseUrl(portal.absolute_url())
+
+    browser.handleErrors = True
+    portal.error_log._ignored_exceptions = ()
+
+    setRoles(portal, TEST_USER_ID, ['Manager'])
+
+    transaction.commit()
+
+
+def DocFileSuite(testfile, flags=FLAGS, setUp=setUp, layer=FUNCTIONAL_TESTING):
+    """Returns a test suite configured with a test layer.
+
+:param testfile: Path to a doctest file.
+:type testfile: str
+
+:param flags: Doctest test flags.
+:type flags: int
+
+:param setUp: Test set up function.
+:type setUp: callable
+
+:param layer: Test layer
+:type layer: object
+
+:rtype: `manuel.testing.TestSuite`
+"""
+    m = manuel.doctest.Manuel(optionflags=flags, checker=CHECKER)
+    m += manuel.codeblock.Manuel()
+
+    return layered(
+        manuel.testing.TestSuite(m, testfile, setUp=setUp, globs=dict(layer=layer)),
+        layer=layer)
 
 
 def test_suite():
-    filenames = list_doctests()
-
-    return unittest.TestSuite(
-        [Suite(os.path.basename(filename),
-               optionflags=OPTIONFLAGS,
-               package='Products.Ploneboard.tests',
-               test_class=PloneboardFunctionalTestCase)
-         for filename in filenames]
-        )
+    return unittest.TestSuite([
+        DocFileSuite('AdminLocksBoard.txt'),
+        DocFileSuite('FreeForAllForum.txt'),
+        DocFileSuite('MemberEditsComment.txt'),
+        DocFileSuite('MemberOnlyForum.txt'),
+        DocFileSuite('MemberPostingForum.txt'),
+        DocFileSuite('ModeratedForum.txt'),
+        ])

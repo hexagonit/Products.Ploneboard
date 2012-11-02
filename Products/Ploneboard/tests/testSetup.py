@@ -2,14 +2,16 @@
 # Ploneboard tests
 #
 
-from Products.Ploneboard.tests import PloneboardTestCase
-
-# Catch errors in Install
-from Products.Ploneboard.Extensions import Install
-
 from Products.CMFCore.utils import getToolByName
+from Products.Ploneboard.Extensions import Install  # Catch errors in Install
+from Products.Ploneboard.tests import PloneboardTestCase
+from Products.Ploneboard.tests.base import IntegrationTestCase
 
-class TestSetup(PloneboardTestCase.PloneboardTestCase):
+
+class TestSetup(IntegrationTestCase):
+
+    def setUp(self):
+        self.portal = self.layer['portal']
 
     def testSkins(self):
         portal_skins = self.portal.portal_skins.objectIds()
@@ -49,19 +51,13 @@ class TestSetup(PloneboardTestCase.PloneboardTestCase):
         self.failUnless('url_to_hyperlink' in transforms)
 
     def testCatalogIndex(self):
-        ct = getToolByName(self.portal, 'portal_catalog') 
+        ct = getToolByName(self.portal, 'portal_catalog')
         self.failUnless('object_provides' in ct.indexes())
         self.failUnless('num_comments' in ct.indexes())
         self.failUnless('num_comments' in ct.schema())
 
     def testPortalFactorySetup(self):
-        portal_factory = getToolByName(self.portal, 'portal_factory') 
+        portal_factory = getToolByName(self.portal, 'portal_factory')
         factoryTypes = portal_factory.getFactoryTypes().keys()
         for t in ['Ploneboard', 'PloneboardComment', 'PloneboardConversation', 'PloneboardForum']:
             self.failUnless(t in factoryTypes)
-
-def test_suite():
-    from unittest import TestSuite, makeSuite
-    suite = TestSuite()
-    suite.addTest(makeSuite(TestSetup))
-    return suite

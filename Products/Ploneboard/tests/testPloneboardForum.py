@@ -2,21 +2,25 @@
 # Forum tests
 #
 
-import unittest
+from Products.CMFCore.utils import getToolByName
+from Products.CMFPlone.utils import _createObjectByType
+from Products.Ploneboard.content.PloneboardForum import PloneboardForum
+from Products.Ploneboard.interfaces import IForum
+from Products.Ploneboard.tests.base import IntegrationTestCase
+from plone.app.testing import TEST_USER_ID
+from plone.app.testing import setRoles
 from zExceptions import Unauthorized
 from zope.interface.verify import verifyClass, verifyObject
 
-import PloneboardTestCase
-from Products.Ploneboard.interfaces import IForum
-from Products.Ploneboard.content.PloneboardForum import PloneboardForum
-
-from Products.CMFCore.utils import getToolByName
-from Products.CMFPlone.utils import _createObjectByType
+import unittest
 
 
-class TestPloneboardForum(PloneboardTestCase.PloneboardTestCase):
+class TestPloneboardForum(IntegrationTestCase):
 
-    def afterSetUp(self):
+    def setUp(self):
+        portal = self.layer['portal']
+        setRoles(portal, TEST_USER_ID, ['Manager'])
+        self.folder = portal[portal.invokeFactory('Folder', 'folder')]
         self.board = _createObjectByType('Ploneboard', self.folder, 'board')
         self.forum = _createObjectByType('PloneboardForum', self.board, 'forum')
 
@@ -25,7 +29,7 @@ class TestPloneboardForum(PloneboardTestCase.PloneboardTestCase):
 
     def testInterfaceConformance(self):
         self.failUnless(IForum.providedBy(self.forum))
-        self.failUnless(verifyObject(IForum, self.forum))        
+        self.failUnless(verifyObject(IForum, self.forum))
 
     def testForumFields(self):
         """
@@ -88,18 +92,18 @@ class TestPloneboardForum(PloneboardTestCase.PloneboardTestCase):
         conv = forum.addConversation('subject', 'body')
         conv2 = forum.addConversation('subject2', 'body2')
         # Notice reverse ordering, last always first
-        self.failUnlessEqual(forum.getConversations(), [conv2, conv]) 
+        self.failUnlessEqual(forum.getConversations(), [conv2, conv])
         # Check to make sure it doesn't get comments elsewhere
         forum2 = _createObjectByType('PloneboardForum', self.board, 'forum2')
         forum2.addConversation('subject', 'body')
-        self.failUnlessEqual(forum.getConversations(), [conv2, conv]) 
+        self.failUnlessEqual(forum.getConversations(), [conv2, conv])
 
     def testGetConversationsWithSlicing(self):
         forum = self.forum
         conv = forum.addConversation('subject', 'body')
         conv2 = forum.addConversation('subject2', 'body2')
-        self.failUnlessEqual(forum.getConversations(limit=1, offset=0), [conv2]) 
-        self.failUnlessEqual(forum.getConversations(limit=1, offset=1), [conv]) 
+        self.failUnlessEqual(forum.getConversations(limit=1, offset=0), [conv2])
+        self.failUnlessEqual(forum.getConversations(limit=1, offset=1), [conv])
 
     def testGetConversationsOutsideStrictContainment(self):
         # Make a folder inside the forum, then a conversation in the folder
@@ -135,14 +139,18 @@ class TestPloneboardForum(PloneboardTestCase.PloneboardTestCase):
         conv = forum2.addConversation('subject', 'body')
         conv.addComment("another", "another")
         self.failUnlessEqual(forum.getNumberOfComments(), 2)
-    
-class TestPloneboardForumRSSFeed(PloneboardTestCase.PloneboardTestCase):
 
-    def afterSetUp(self):
-        self.board = _createObjectByType('Ploneboard', self.folder, 'board',
+
+class TestPloneboardForumRSSFeed(IntegrationTestCase):
+
+    def setUp(self):
+        portal = self.layer['portal']
+        setRoles(portal, TEST_USER_ID, ['Manager'])
+        folder = portal[portal.invokeFactory('Folder', 'folder')]
+        self.board = _createObjectByType('Ploneboard', folder, 'board',
                 title='Test Board')
         self.forum=self.board.addForum('forum1', 'Title one', 'Description one')
-        self.syn_tool = getToolByName(self.portal, 'portal_syndication')
+        self.syn_tool = getToolByName(portal, 'portal_syndication')
         self.view = self.forum.restrictedTraverse("@@RSS")
 
     def testDisblingSyndication(self):
@@ -183,10 +191,3 @@ class TestPloneboardForumRSSFeed(PloneboardTestCase.PloneboardTestCase):
         self.assertEqual(comment['author'], 'test_user_1_')
         self.failUnless('date' in comment)
         self.failUnless('url' in comment)
-
-
-def test_suite():
-    suite = unittest.TestSuite()
-    suite.addTest(unittest.makeSuite(TestPloneboardForum))
-    suite.addTest(unittest.makeSuite(TestPloneboardForumRSSFeed))
-    return suite

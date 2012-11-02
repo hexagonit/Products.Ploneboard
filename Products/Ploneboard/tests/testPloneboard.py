@@ -2,22 +2,26 @@
 # Ploneboard tests
 #
 
-import unittest
+from Products.CMFCore.utils import getToolByName
+from Products.CMFPlone.utils import _createObjectByType
+from Products.Ploneboard.Extensions import Install  # Catch errors in Install
+from Products.Ploneboard.content.Ploneboard import Ploneboard
+from Products.Ploneboard.interfaces import IPloneboard, IForum
+from Products.Ploneboard.tests.base import IntegrationTestCase
+from plone.app.testing import TEST_USER_ID
+from plone.app.testing import setRoles
 from zExceptions import Unauthorized
 from zope.interface.verify import verifyClass, verifyObject
-from Products.Ploneboard.tests import PloneboardTestCase
-from Products.Ploneboard.interfaces import IPloneboard, IForum
-from Products.Ploneboard.content.Ploneboard import Ploneboard
-from Products.CMFCore.utils import getToolByName
 
-# Catch errors in Install
-from Products.Ploneboard.Extensions import Install
-
-from Products.CMFPlone.utils import _createObjectByType
+import unittest
 
 
-class TestPloneboardBasics(PloneboardTestCase.PloneboardTestCase):
+class TestPloneboardBasics(IntegrationTestCase):
     """Test the basics, like creation"""
+
+    def setUp(self):
+        self.portal = self.layer['portal']
+        setRoles(self.portal, TEST_USER_ID, ['Manager'])
 
     def testPloneboardCreation(self):
         """Try creating and deleting a board"""
@@ -29,21 +33,24 @@ class TestPloneboardBasics(PloneboardTestCase.PloneboardTestCase):
         self.failIf(board_id in self.portal.objectIds())
 
 
-class TestPloneboardInterface(PloneboardTestCase.PloneboardTestCase):
+class TestPloneboardInterface(IntegrationTestCase):
     """Test if it fulfills the interface"""
 
-    def afterSetUp(self):
-        self.board = _createObjectByType('Ploneboard', self.folder, 'board')
+    def setUp(self):
+        portal = self.layer['portal']
+        setRoles(portal, TEST_USER_ID, ['Manager'])
+        folder = portal[portal.invokeFactory('Folder', 'folder')]
+        self.board = _createObjectByType('Ploneboard', folder, 'board')
 
     def testInterfaceVerification(self):
         self.failUnless(verifyClass(IPloneboard, Ploneboard))
 
     def testInterfaceConformance(self):
         self.failUnless(IPloneboard.providedBy(self.board))
-        self.failUnless(verifyObject(IPloneboard, self.board))        
+        self.failUnless(verifyObject(IPloneboard, self.board))
 
     def testAddForum(self):
-        """Create new folder in home directory & check its basic 
+        """Create new folder in home directory & check its basic
         properties and behaviour"""
         board = self.board
         forum_id = 'forum'
@@ -86,10 +93,13 @@ class TestPloneboardInterface(PloneboardTestCase.PloneboardTestCase):
         pass
 
 
-class TestPloneboardWithoutContainment(PloneboardTestCase.PloneboardTestCase):
+class TestPloneboardWithoutContainment(IntegrationTestCase):
     """Test a single board used more as a topic, with forums in folders"""
 
-    def afterSetUp(self):
+    def setUp(self):
+        portal = self.layer['portal']
+        setRoles(portal, TEST_USER_ID, ['Manager'])
+        self.folder = portal[portal.invokeFactory('Folder', 'folder')]
         self.board = _createObjectByType('Ploneboard', self.folder, 'board')
 
     def testGetForumsOutsideBoard(self):
@@ -100,12 +110,15 @@ class TestPloneboardWithoutContainment(PloneboardTestCase.PloneboardTestCase):
         self.failUnless(forum2 in forums)
 
 
-class TestPloneboardRSSFeed(PloneboardTestCase.PloneboardTestCase):
+class TestPloneboardRSSFeed(IntegrationTestCase):
 
-    def afterSetUp(self):
-        self.board = _createObjectByType('Ploneboard', self.folder, 'board',
+    def setUp(self):
+        portal = self.layer['portal']
+        setRoles(portal, TEST_USER_ID, ['Manager'])
+        folder = portal[portal.invokeFactory('Folder', 'folder')]
+        self.board = _createObjectByType('Ploneboard', folder, 'board',
                 title='Test Board')
-        self.syn_tool = getToolByName(self.portal, 'portal_syndication')
+        self.syn_tool = getToolByName(portal, 'portal_syndication')
         self.view = self.board.restrictedTraverse("@@RSS")
 
     def testEnablingSyndication(self):
@@ -147,12 +160,3 @@ class TestPloneboardRSSFeed(PloneboardTestCase.PloneboardTestCase):
         self.assertEqual(comment['author'], 'test_user_1_')
         self.failUnless('date' in comment)
         self.failUnless('url' in comment)
-
-
-def test_suite():
-    suite = unittest.TestSuite()
-    suite.addTest(unittest.makeSuite(TestPloneboardBasics))
-    suite.addTest(unittest.makeSuite(TestPloneboardInterface))
-    suite.addTest(unittest.makeSuite(TestPloneboardWithoutContainment))
-    suite.addTest(unittest.makeSuite(TestPloneboardRSSFeed))
-    return suite

@@ -2,23 +2,29 @@
 # Comment tests
 #
 
-import unittest
-from zope.interface.verify import verifyClass
-
-import PloneboardTestCase
-from Products.Ploneboard.interfaces import IComment
-from Products.Ploneboard.content.PloneboardComment import PloneboardComment
-from Products.Ploneboard.config import HAS_SIMPLEATTACHMENT
-
 from OFS.Image import File
 from Products.CMFPlone.utils import _createObjectByType
-
+from Products.Ploneboard.config import HAS_SIMPLEATTACHMENT
+from Products.Ploneboard.content.PloneboardComment import PloneboardComment
+from Products.Ploneboard.interfaces import IComment
+from Products.Ploneboard.tests.base import IntegrationTestCase
 from Products.Ploneboard.tests.utils import addMember
+from plone.app.testing import TEST_USER_ID
+from plone.app.testing import login
+from plone.app.testing import logout
+from plone.app.testing import setRoles
+from zope.interface.verify import verifyClass
 
-class TestPloneboardComment(PloneboardTestCase.PloneboardTestCase):
+import unittest
 
-    def afterSetUp(self):
-        self.board = _createObjectByType('Ploneboard', self.folder, 'board')
+
+class TestPloneboardComment(IntegrationTestCase):
+
+    def setUp(self):
+        self.portal = self.layer['portal']
+        setRoles(self.portal, TEST_USER_ID, ['Manager'])
+        folder = self.portal[self.portal.invokeFactory('Folder', 'folder')]
+        self.board = _createObjectByType('Ploneboard', folder, 'board')
         self.forum = _createObjectByType('PloneboardForum', self.board, 'forum')
         self.conv = self.forum.addConversation('conv1', 'conv1 body')
         self.comment = self.conv.addComment("comment1", "comment1 body")
@@ -36,7 +42,7 @@ class TestPloneboardComment(PloneboardTestCase.PloneboardTestCase):
 
     def testAddReplyAsAnonymousTakesOwnerOfForumAndCreatorAnonymous(self):
         conv = self.conv
-        self.logout()
+        logout()
         reply = self.comment.addReply('reply1', 'body1', creator='Anonymous')
         self.assertEqual(conv.getForum().owner_info()['id'], reply.owner_info()['id'])
         self.assertEqual(reply.Creator(), 'Anonymous')
@@ -44,7 +50,7 @@ class TestPloneboardComment(PloneboardTestCase.PloneboardTestCase):
     def testAddReplyAsNotAnonymousLeavesOwnershipAlone(self):
         conv = self.conv
         addMember(self, 'member2')
-        self.login('member2')
+        login(self.portal, 'member2')
         self.assertNotEqual(conv.getForum().owner_info()['id'], 'member2')
         reply = self.comment.addReply('reply1', 'body1')
         self.assertEqual(reply.owner_info()['id'], 'member2')
@@ -140,31 +146,32 @@ class TestPloneboardComment(PloneboardTestCase.PloneboardTestCase):
     def testNewCommentIsVisibleToAnonymous(self):
         comment = self.conv.addComment('subject2', 'body2')
         id = comment.getId()
-        self.logout()
+        logout()
         comments = self.conv.getComments()
         self.failUnless(id in [x.getId() for x in comments])
-    
+
     def testMemberWithNoFullname(self):
         addMember(self, 'membernofullname', fullname='')
-        self.login('membernofullname')
+        login(self.portal, 'membernofullname')
         comment = self.conv.addComment('subject3', 'body3')
         commentview = comment.restrictedTraverse('@@singlecomment_view')
         self.assertEqual(commentview.author(), 'membernofullname')
 
     def testMemberWithFullname(self):
         addMember(self, 'memberwithfullname', fullname='MemberName')
-        self.login('memberwithfullname')
+        login(self.portal, 'memberwithfullname')
         comment = self.conv.addComment('subject4', 'body4')
         commentview = comment.restrictedTraverse('@@singlecomment_view')
         self.assertEqual(commentview.author(), 'MemberName')
 
 
+class TestPloneboardCommentAttachmentSupport(IntegrationTestCase):
 
-
-class TestPloneboardCommentAttachmentSupport(PloneboardTestCase.PloneboardTestCase):
-
-    def afterSetUp(self):
-        self.board = _createObjectByType('Ploneboard', self.folder, 'board')
+    def setUp(self):
+        portal = self.layer['portal']
+        setRoles(portal, TEST_USER_ID, ['Manager'])
+        folder = portal[portal.invokeFactory('Folder', 'folder')]
+        self.board = _createObjectByType('Ploneboard', folder, 'board')
         self.forum = _createObjectByType('PloneboardForum', self.board, 'forum')
         self.conv = self.forum.addConversation('conv1', 'conv1 body')
         self.comment = self.conv.addComment("comment1", "comment1 body")
@@ -302,11 +309,3 @@ class TestPloneboardCommentAttachmentSupport(PloneboardTestCase.PloneboardTestCa
 
         c21.delete()
         self.assert_(self.conv.getRootComments(), [c211])
-
-def test_suite():
-    suite = unittest.TestSuite()
-    suite.addTest(unittest.makeSuite(TestPloneboardComment))
-    if HAS_SIMPLEATTACHMENT:
-        suite.addTest(unittest.makeSuite(TestPloneboardCommentAttachmentSupport))
-
-    return suite

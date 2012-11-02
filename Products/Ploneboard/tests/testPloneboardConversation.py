@@ -2,21 +2,28 @@
 # Conversation tests
 #
 
+from Products.CMFPlone.utils import _createObjectByType
+from Products.Ploneboard.content.PloneboardConversation import PloneboardConversation
+from Products.Ploneboard.interfaces import IConversation
+from Products.Ploneboard.tests.base import IntegrationTestCase
+from Products.Ploneboard.tests.utils import addMember
+from plone.app.testing import TEST_USER_ID
+from plone.app.testing import login
+from plone.app.testing import logout
+from plone.app.testing import setRoles
+from zope.interface.verify import verifyClass, verifyObject
+
 import transaction
 import unittest
-from zope.interface.verify import verifyClass, verifyObject
-import PloneboardTestCase
 
-from Products.CMFPlone.utils import _createObjectByType
-from Products.Ploneboard.interfaces import IConversation
-from Products.Ploneboard.content.PloneboardConversation import PloneboardConversation
 
-from Products.Ploneboard.tests.utils import addMember
+class TestPloneboardConversation(IntegrationTestCase):
 
-class TestPloneboardConversation(PloneboardTestCase.PloneboardTestCase):
-
-    def afterSetUp(self):
-        self.board = _createObjectByType('Ploneboard', self.folder, 'board')
+    def setUp(self):
+        self.portal = self.layer['portal']
+        setRoles(self.portal, TEST_USER_ID, ['Manager'])
+        folder = self.portal[self.portal.invokeFactory('Folder', 'folder')]
+        self.board = _createObjectByType('Ploneboard', folder, 'board')
         self.forum = _createObjectByType('PloneboardForum', self.board, 'forum')
         self.conv = self.forum.addConversation('subject', 'body')
         self.comment = self.conv.getComments()[0]
@@ -49,13 +56,13 @@ class TestPloneboardConversation(PloneboardTestCase.PloneboardTestCase):
     def testGetComments(self):
         conv = self.conv
         comment2 = conv.addComment('subject2', 'body2')
-        self.failUnlessEqual(conv.getComments(), [self.comment, comment2]) 
+        self.failUnlessEqual(conv.getComments(), [self.comment, comment2])
 
     def testGetCommentsSlicing(self):
         conv = self.conv
         comment2 = conv.addComment('subject2', 'body2')
-        self.failUnlessEqual(conv.getComments(limit=1, offset=0), [self.comment]) 
-        self.failUnlessEqual(conv.getComments(limit=1, offset=1), [comment2]) 
+        self.failUnlessEqual(conv.getComments(limit=1, offset=0), [self.comment])
+        self.failUnlessEqual(conv.getComments(limit=1, offset=1), [comment2])
 
     def testGetNumberOfComments(self):
         conv = self.conv
@@ -127,7 +134,7 @@ class TestPloneboardConversation(PloneboardTestCase.PloneboardTestCase):
         # check if Comment was uncataloged
         self.failIf(r.getId() in [v.id for v in self.catalog(meta_type='PloneboardComment', id=r.getId())])
         self.failIf(msg.getId() in [v.id for v in self.catalog(meta_type='PloneboardComment', id=msg.getId())])
-        
+
         # Checking non recursive delete
         conv = forum.addConversation('subject', 'body')
         msg = conv.objectValues()[0]
@@ -137,28 +144,28 @@ class TestPloneboardConversation(PloneboardTestCase.PloneboardTestCase):
         conv._delObject(msg.getId())
         self.assertEqual(conv.getNumberOfComments(), 1)
         self.failUnless(r.getId() in [v.getId for v in self.catalog(meta_type='PloneboardComment', id=r.getId())])
-        
+
     def testNewConversationIsVisibleToAnonymous(self):
         conv = self.forum.addConversation('subject2', 'body2')
         conv.addComment("comment", "comment")
         id = conv.getId()
-        self.logout()
+        logout()
         convs = self.forum.getConversations()
 #        self.failUnless(id in [x.getId() for x in convs])
         comments = conv.getComments()
         self.assertEqual(len(comments), 2)
-        
+
     def testAddCommentAsAnonymousTakesOwnerOfForumAndCreatorAnonymous(self):
         conv = self.conv
-        self.logout()
+        logout()
         reply = conv.addComment('reply1', 'body1', creator='Anonymous')
         self.assertEqual(conv.getForum().owner_info()['id'], reply.owner_info()['id'])
         self.assertEqual(reply.Creator(), 'Anonymous')
-    
+
     def testAddCommentAsNotAnonymousLeavesOwnershipAlone(self):
         conv = self.conv
         addMember(self, 'member2')
-        self.login('member2')
+        login(self.portal, 'member2')
         self.assertNotEqual(conv.getForum().owner_info()['id'], 'member2')
         reply = conv.addComment('reply1', 'body1')
         self.assertEqual(reply.owner_info()['id'], 'member2')
@@ -187,9 +194,3 @@ class TestPloneboardConversation(PloneboardTestCase.PloneboardTestCase):
         self.failUnless(comment.getId() in self.conv.objectIds())
         self.failUnless(len(self.conv.getComments()) == 2)
         self.failUnless(conv2.getId() in self.forum.objectIds()) # We only moved the comment
-
-
-def test_suite():
-    suite = unittest.TestSuite()
-    suite.addTest(unittest.makeSuite(TestPloneboardConversation))
-    return suite

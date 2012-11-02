@@ -3,23 +3,29 @@
 #
 
 from AccessControl.Permission import Permission
-from Products.CMFPlone.tests import PloneTestCase
-
 from Products.CMFCore.utils import _checkPermission as checkPerm
+from Products.CMFPlone.tests import PloneTestCase
 from Products.CMFPlone.utils import _createObjectByType
-
-from Products.Ploneboard.Extensions import WorkflowScripts # Catch errors
-from Products.Ploneboard.tests import PloneboardTestCase
 from Products.Ploneboard import permissions
+from Products.Ploneboard.Extensions import WorkflowScripts # Catch errors
+from Products.Ploneboard.tests.base import IntegrationTestCase
+from plone.app.testing import TEST_USER_ID
+from plone.app.testing import login
+from plone.app.testing import logout
+from plone.app.testing import setRoles
+
 
 default_user = PloneTestCase.default_user
 
 
-class TestCommentWorkflow(PloneboardTestCase.PloneboardTestCase):
+class TestCommentWorkflow(IntegrationTestCase):
 
-    def afterSetUp(self):
+    def setUp(self):
+        self.portal = self.layer['portal']
+        setRoles(self.portal, TEST_USER_ID, ['Manager'])
+        folder = self.portal[self.portal.invokeFactory('Folder', 'folder')]
         self.workflow = self.portal.portal_workflow
-        self.board = _createObjectByType('Ploneboard', self.folder, 'board')
+        self.board = _createObjectByType('Ploneboard', folder, 'board')
         self.forum = _createObjectByType('PloneboardForum', self.board, 'forum')
         self.conv = self.forum.addConversation('conv1', 'conv1 body')
         self.comment = self.conv.addComment("title", "body")
@@ -33,7 +39,7 @@ class TestCommentWorkflow(PloneboardTestCase.PloneboardTestCase):
 
     def testAutoPublishMemberposting(self):
 
-        self.login('member')
+        login(self.portal, 'member')
         self.failUnless(checkPerm(permissions.ApproveComment, self.forum))
         self.failUnless(checkPerm(permissions.ApproveComment, self.conv))
         self.failUnless(checkPerm(permissions.ApproveComment, self.comment))
@@ -46,7 +52,7 @@ class TestCommentWorkflow(PloneboardTestCase.PloneboardTestCase):
 #    def testAutoSubmitModerated(self):
 #        self.workflow.doActionFor(self.forum, 'make_moderated')
 #
-#        self.login('member')
+#        login(self.portal, 'member')
 #
 #        conv = self.forum.addConversation('conv2', 'conv2 body')
 #        comment = conv.objectValues()[0]
@@ -60,21 +66,22 @@ class TestCommentWorkflow(PloneboardTestCase.PloneboardTestCase):
 #        self.assertEqual(self.workflow.getInfoFor(comment, 'review_state'), 'pending')
 
     def testCommentEditing(self):
-        self.login('manager')
+        login(self.portal, 'manager')
 
         conv = self.forum.addConversation('conv2', 'conv2 body')
-        
-        self.failUnless(checkPerm(permissions.EditComment, self.comment))
-        
-        self.logout()
 
-        self.login('member2')
+        self.failUnless(checkPerm(permissions.EditComment, self.comment))
+
+        logout()
+
+        login(self.portal, 'member2')
         self.failIf(checkPerm(permissions.EditComment, self.comment))
 
 
-class TestWorkflowsCreation(PloneboardTestCase.PloneboardTestCase):
+class TestWorkflowsCreation(IntegrationTestCase):
 
-    def afterSetUp(self):
+    def setUp(self):
+        self.portal = self.layer['portal']
         self.workflow = self.portal.portal_workflow
 
     def testWorkflowsCreated(self):
@@ -107,11 +114,3 @@ class TestWorkflowsCreation(PloneboardTestCase.PloneboardTestCase):
         p=Permission('Ploneboard: Add Comment Attachment', (), self.portal)
         roles=p.getRoles()
         self.failUnless('Member' in roles)
-
-
-def test_suite():
-    from unittest import TestSuite, makeSuite
-    suite = TestSuite()
-    suite.addTest(makeSuite(TestCommentWorkflow))
-    suite.addTest(makeSuite(TestWorkflowsCreation))
-    return suite
