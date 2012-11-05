@@ -8,6 +8,8 @@ Changelog
   [davilima6]
 - Pointed link fixed to navigation root instead of plone root.
   [taito]
+- Updated test to use plone.app.testing. [taito]
+- Tested with Plone-4.2.2. [taito]
 
 3.3 (2012-09-08)
 ----------------
