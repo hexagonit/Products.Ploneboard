@@ -5,7 +5,6 @@
 from Products.CMFCore.utils import getToolByName
 from Products.CMFPlone.utils import _createObjectByType
 from Products.Ploneboard.config import PLONEBOARD_TOOL
-from Products.Ploneboard.tests import PloneboardTestCase
 from Products.Ploneboard.tests.base import IntegrationTestCase
 from plone.app.testing import TEST_USER_ID
 from plone.app.testing import setRoles

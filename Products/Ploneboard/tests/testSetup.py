@@ -4,7 +4,6 @@
 
 from Products.CMFCore.utils import getToolByName
 from Products.Ploneboard.Extensions import Install  # Catch errors in Install
-from Products.Ploneboard.tests import PloneboardTestCase
 from Products.Ploneboard.tests.base import IntegrationTestCase
 
 
