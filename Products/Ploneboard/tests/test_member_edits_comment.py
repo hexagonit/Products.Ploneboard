@@ -1,5 +1,6 @@
 from DateTime import DateTime
 from Products.CMFCore.utils import getToolByName
+from Products.CMFPlacefulWorkflow.WorkflowPolicyConfig import manage_addWorkflowPolicyConfig
 from hexagonit.testing.browser import Browser
 from plone.app.testing import TEST_USER_ID
 from plone.app.testing import TEST_USER_NAME
@@ -39,8 +40,18 @@ def setUpDefaultMembersBoardAndForum(portal):
     addMember(portal, 'member2', 'Member two', 'member2@example.com', roles=('Member',))
     addMember(portal, 'manager1', 'Manager one', 'manager1@example.com', roles=('Manager',))
     addMember(portal, 'reviewer1', 'Reviewer one', 'reviewer1@example.com', roles=('Reviewer',))
+
     board = portal[portal.invokeFactory('Ploneboard', 'board1')]
     board.addForum('forum1', 'Forum 1', 'Forum one')
+
+
+def setupEditableForum(portal):
+    forum = portal['board1']['forum1']
+    manage_addWorkflowPolicyConfig(forum)
+    pw_tool = portal.portal_placeful_workflow
+    config = pw_tool.getWorkflowPolicyConfig(forum)
+    config.setPolicyIn(policy='EditableComment')
+    config.setPolicyBelow(policy='EditableComment', update_security=True)
 
 
 def setUp(self):
@@ -67,10 +78,8 @@ def setUp(self):
     setUpDefaultMembersBoardAndForum(portal)
     setRoles(portal, 'reviewer1', ['Reviewer'])
 
-    board = portal['board1']
-    forum = board['forum1']
-    self.globs['board'] = board
-    self.globs['forum'] = forum
+    setupEditableForum(portal)
+
 
     transaction.commit()
 
@@ -102,9 +111,5 @@ def DocFileSuite(testfile, flags=FLAGS, setUp=setUp, layer=FUNCTIONAL_TESTING):
 
 def test_suite():
     return unittest.TestSuite([
-        DocFileSuite('AdminLocksBoard.txt'),
-        DocFileSuite('FreeForAllForum.txt'),
-        DocFileSuite('MemberOnlyForum.txt'),
-        DocFileSuite('MemberPostingForum.txt'),
-        DocFileSuite('ModeratedForum.txt'),
+        DocFileSuite('MemberEditsComment.txt'),
         ])

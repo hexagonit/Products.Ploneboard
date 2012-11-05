@@ -1,43 +1,19 @@
 Using a member-posting forum
 ============================
 
-Test starting conversations, replying and modifying comments in a default
-member-posting forum.
+Verify that the forum is indeed a member-posting one by default and log in::
 
-First, some set-up:
-
-    >>> from Zope2.App import zcml
-    >>> import Products
-    >>> zcml.load_config('configure.zcml', package=Products.Ploneboard)
-
-    >>> from Products.Ploneboard.tests import utils
-    >>> utils.setUpDefaultMembersBoardAndForum(self)
-
-    >>> from Testing.testbrowser import Browser
-    >>> browser = Browser()
-    >>> browser.handleErrors = False
-
-Let us log all exceptions, which is useful for debugging. Also, clear portlet
-slots, to make the test browser less confused by things like the recent portlet
-and the navtree.
-
-    >>> self.portal.error_log._ignored_exceptions = ()
-    >>> self.portal.left_slots = self.portal.right_slots = []
-    >>> workflow = self.portal.portal_workflow
-
-Verify that the forum is indeed a member-posting one by default and log in:
-
-    >>> workflow.getInfoFor(self.forum, 'review_state')
+    >>> workflow.getInfoFor(forum, 'review_state')
     'memberposting'
 
-    >>> utils.logoutThenLoginAs(self, browser, 'member1')
+    >>> browser.login('member1', 'secret')
 
 View forum
 ----------
 
 The forum created behind the scenes should now be shown here.
 
-    >>> browser.open(self.board.absolute_url())
+    >>> browser.open(board.absolute_url())
     >>> browser.contents
     '...Forum 1...'
 
@@ -69,9 +45,9 @@ Submit the form, and we should be returned to the forum view. The conversation
 should exist, and we should be able to view it.
 
     >>> browser.getControl(name='form.button.Post').click()
-    >>> browser.url.startswith(self.forum.absolute_url())
+    >>> browser.url.startswith(forum.absolute_url())
     True
-    >>> conversation = self.forum.getConversations()[0]
+    >>> conversation = forum.getConversations()[0]
 
     >>> import re
     >>> browser.getLink(url=re.compile('\/%s$' % conversation.getId())).click()
@@ -133,7 +109,6 @@ present.
     ...
     LookupError: label 'Delete'
 
-
 Delete a conversation
 ---------------------
 
@@ -171,11 +146,12 @@ View other member's comment
 
 Log in as another member
 
-    >>> utils.logoutThenLoginAs(self, browser, 'member2')
+    >>> browser.getLink('Log out').click()
+    >>> browser.login('member2', 'secret')
 
 Find the forum, and go to the new post.
 
-    >>> browser.open(self.forum.absolute_url())
+    >>> browser.open(forum.absolute_url())
     >>> browser.getLink(url='/%s' % conversation.getId()).click()
 
 Add reply to other member's comment
@@ -216,29 +192,30 @@ View as reviewer
 
 Log in as a reviewer.
 
-    >>> utils.logoutThenLoginAs(self, browser, 'reviewer1')
+    >>> browser.getLink('Log out').click()
+    >>> browser.login('reviewer1', 'secret')
 
 Find the forum, and go to the new post.
 
-    >>> browser.open(self.forum.absolute_url())
+    >>> browser.open(forum.absolute_url())
     >>> browser.getLink(url='/%s' % conversation.getId()).click()
 
 The moderation queue form is not shown since this is not a moderated forum.
 
-    >>> browser.open(self.forum.absolute_url())
+    >>> browser.open(forum.absolute_url())
     >>> 'moderation_form' in browser.contents
     False
 
 The moderation queue form is not shown since this is not a moderated forum.
 
-    >>> browser.open(self.forum.absolute_url())
+    >>> browser.open(forum.absolute_url())
     >>> 'moderation_form' in browser.contents
     False
 
 It is, however, shown at the root board, since that aggregates all forums. Make
 sure it is empty.
 
-    >>> browser.open(self.board.absolute_url())
+    >>> browser.open(board.absolute_url())
     >>> browser.getLink('Moderate').click()
     >>> browser.contents
     '...There are no comments in the moderation queue...'
@@ -268,18 +245,20 @@ However, a reviewer can retract a comment:
 
 Logging in as another member, the retracted comment cannot be viewed:
 
-    >>> utils.logoutThenLoginAs(self, browser, 'member2')
+    >>> browser.getLink('Log out').click()
+    >>> browser.login('member2', 'secret')
 
-    >>> browser.open(self.forum.absolute_url())
+    >>> browser.open(forum.absolute_url())
     >>> browser.getLink(url='/%s' % conversation.getId()).click()
     >>> 'retracted' in browser.contents
     False
 
 However, the owner can see it, but cannot publish.
 
-    >>> utils.logoutThenLoginAs(self, browser, 'member1')
+    >>> browser.getLink('Log out').click()
+    >>> browser.login('member1', 'secret')
 
-    >>> browser.open(self.forum.absolute_url())
+    >>> browser.open(forum.absolute_url())
     >>> browser.getLink(url='/%s' % conversation.getId()).click()
     >>> 'retracted' in browser.contents
     True
@@ -290,9 +269,10 @@ However, the owner can see it, but cannot publish.
 
 The reviewer can re-publish the comment again:
 
-    >>> utils.logoutThenLoginAs(self, browser, 'reviewer1')
+    >>> browser.getLink('Log out').click()
+    >>> browser.login('reviewer1', 'secret')
 
-    >>> browser.open(self.forum.absolute_url())
+    >>> browser.open(forum.absolute_url())
     >>> browser.getLink(url='/%s' % conversation.getId()).click()
     >>> 'retracted' in browser.contents
     True
@@ -305,11 +285,12 @@ View as manager
 
 Log in as a manager.
 
-    >>> utils.logoutThenLoginAs(self, browser, 'manager1')
+    >>> browser.getLink('Log out').click()
+    >>> browser.login('manager1', 'secret')
 
 Find the forum, and go to the new post.
 
-    >>> browser.open(self.forum.absolute_url())
+    >>> browser.open(forum.absolute_url())
     >>> browser.getLink(url='/%s' % conversation.getId()).click()
 
 A manager can edit and delete comments, as well as apply workflow transitions.
@@ -347,8 +328,10 @@ Lock a conversation, and ensure that reply buttons do not appear.
 
 Verify that they do not appear as a regular member either.
 
-    >>> utils.logoutThenLoginAs(self, browser, 'member1')
-    >>> browser.open(self.forum.absolute_url())
+    >>> browser.getLink('Log out').click()
+    >>> browser.login('member1', 'secret')
+
+    >>> browser.open(forum.absolute_url())
     >>> browser.getLink(url='/%s' % conversation.getId()).click()
 
     >>> browser.getControl(name='form.button.Post')
@@ -362,7 +345,9 @@ Verify that they do not appear as a regular member either.
 
 Unlock again
 
-    >>> utils.logoutThenLoginAs(self, browser, 'manager1')
+    >>> browser.getLink('Log out').click()
+    >>> browser.login('manager1', 'secret')
+
     >>> browser.open(conversation.absolute_url())
     >>> browser.getLink('Activate').click()
 
@@ -371,8 +356,9 @@ View as anonymous
 
 Log out, and ensure the post can be viewed by anonymous.
 
-    >>> browser.open('%s/logout' % self.portal.absolute_url())
-    >>> browser.open(self.board.absolute_url())
+    >>> browser.getLink('Log out').click()
+
+    >>> browser.open(board.absolute_url())
     >>> browser.getLink('Forum one').click()
     >>> browser.getLink(url='/%s' % conversation.getId()).click()
     >>> browser.contents
@@ -385,7 +371,7 @@ However, anonymous cannot post replies or start new threads
     ...
     LookupError: label 'Reply'
 
-    >>> browser.open(self.board.forum1.absolute_url())
+    >>> browser.open(board.forum1.absolute_url())
     >>> browser.getControl('Log in to start a conversation').click()
     >>> browser.url
     '.../login_form...'
@@ -395,8 +381,9 @@ Deleting comments and conversations
 
 A manager can delete comments:
 
-    >>> utils.logoutThenLoginAs(self, browser, 'manager1')
-    >>> browser.open(self.forum.absolute_url())
+    >>> browser.login('manager1', 'secret')
+
+    >>> browser.open(forum.absolute_url())
     >>> browser.getLink(url='/%s' % conversation.getId()).click()
 
     >>> commentsBefore = len(conversation.getComments())
@@ -410,7 +397,7 @@ Deleting the last comment also deletes the entire thread
 
     >>> for i in range(conversation.getNumberOfComments()):
     ...     browser.getControl('Delete', index=0).click()
-    >>> browser.url.startswith(self.forum.absolute_url())
+    >>> browser.url.startswith(forum.absolute_url())
     True
     >>> browser.contents
     '...Conversation deleted...No conversations in this forum yet...'

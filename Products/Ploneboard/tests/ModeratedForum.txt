@@ -1,45 +1,23 @@
 Using a moderated forum
 =======================
 
-Test starting conversations, replying and modifying comments in a moderated
-forum. This is very similar to a member-posting forum, except anonymous users
-cannot see the forum at all.
-
-First, some set-up:
-
-    >>> from Zope2.App import zcml
-    >>> import Products
-    >>> zcml.load_config('configure.zcml', package=Products.Ploneboard)
-
-    >>> from Products.Ploneboard.tests import utils
-    >>> utils.setUpDefaultMembersBoardAndForum(self)
-
-    >>> from Testing.testbrowser import Browser
-    >>> browser = Browser()
-    >>> browser.handleErrors = False
-
-Let us log all exceptions, which is useful for debugging. Also, clear portlet
-slots, to make the test browser less confused by things like the recent portlet
-and the navtree.
-
-    >>> self.portal.error_log._ignored_exceptions = ()
-    >>> self.portal.left_slots = self.portal.right_slots = []
-    >>> workflow = self.portal.portal_workflow
-
 Verify that the forum is indeed a member-posting one by default and log in:
 
-    >>> workflow.doActionFor(self.forum, 'make_moderated')
-    >>> workflow.getInfoFor(self.forum, 'review_state')
+    >>> browser.login(TEST_USER_NAME, TEST_USER_PASSWORD)
+    >>> browser.open('/board1/forum1')
+    >>> browser.getLink('Make moderated').click()
+
+    >>> workflow.getInfoFor(forum, 'review_state')
     'moderated'
 
-    >>> utils.logoutThenLoginAs(self, browser, 'member1')
+    >>> browser.login('member1', 'secret')
 
 View forum
 ----------
 
 The forum created behind the scenes should now be shown here.
 
-    >>> browser.open(self.board.absolute_url())
+    >>> browser.open(board.absolute_url())
     >>> browser.contents
     '...Forum 1...'
 
@@ -71,9 +49,9 @@ Submit the form, and we should be returned to the forum view. The conversation
 should exist, and we should be able to view it.
 
     >>> browser.getControl(name='form.button.Post').click()
-    >>> browser.url.startswith(self.forum.absolute_url())
+    >>> browser.url.startswith(forum.absolute_url())
     True
-    >>> conversation = self.forum.getConversations()[0]
+    >>> conversation = forum.getConversations()[0]
 
     >>> import re
     >>> browser.getLink(url=re.compile('\/%s$' % conversation.getId())).click()
@@ -119,7 +97,7 @@ So long as a comment is pending, it can be deleted by the owner. Deleting the
 last comment in the thread should delete the entire thread.
 
     >>> browser.getControl('Delete').click()
-    >>> browser.url.startswith(self.forum.absolute_url())
+    >>> browser.url.startswith(forum.absolute_url())
     True
     >>> browser.contents
     '...Conversation deleted...No conversations in this forum yet...'
@@ -137,7 +115,7 @@ the moderation queue and one will be published in-line.
     >>> browser.getControl('Body text').value = 'Some <b>body</b> text'
     >>> browser.getControl(name='form.button.Post').click()
 
-    >>> conversation = self.forum.getConversations()[0]
+    >>> conversation = forum.getConversations()[0]
 
     >>> browser.getControl('Start a new Conversation').click()
     >>> browser.url
@@ -165,8 +143,10 @@ View as other member
 
 Another member cannot see the newly pending conversation or comment.
 
-    >>> utils.logoutThenLoginAs(self, browser, 'manager2')
-    >>> browser.open(self.forum.absolute_url())
+    >>> browser.getLink('Log out').click()
+    >>> browser.login('member2', 'secret')
+
+    >>> browser.open(forum.absolute_url())
 
     >>> browser.contents
     '...No conversations in this forum yet...'
@@ -177,8 +157,10 @@ Moderate
 A reviewer can see the comment in the moderation queue and reject or publish
 it. Moderation can also happen inline.
 
-    >>> utils.logoutThenLoginAs(self, browser, 'reviewer1')
-    >>> browser.open(self.forum.absolute_url())
+    >>> browser.getLink('Log out').click()
+    >>> browser.login('reviewer1', 'secret')
+
+    >>> browser.open(forum.absolute_url())
 
 The moderation tab should appear.
 
@@ -203,7 +185,7 @@ Publish one, reject one from the queue.
 
 Publish one, reject one inline.
 
-    >>> browser.open(self.forum.absolute_url())
+    >>> browser.open(forum.absolute_url())
     >>> 'New title' in browser.contents
     True
     >>> 'Publish inline' in browser.contents
@@ -220,7 +202,7 @@ Publish one, reject one inline.
     >>> 'Waiting for moderator' in browser.contents
     False
 
-    >>> browser.open(self.forum.absolute_url())
+    >>> browser.open(forum.absolute_url())
     >>> browser.getLink('Reject inline').click()
     >>> browser.contents
     '...Waiting for moderator...'
@@ -232,9 +214,10 @@ Publish one, reject one inline.
 
 The original member should see all four conversations.
 
-    >>> utils.logoutThenLoginAs(self, browser, 'reviewer1')
-    >>> browser.open(self.forum.absolute_url())
+    >>> browser.getLink('Log out').click()
+    >>> browser.login('reviewer1', 'secret')
 
+    >>> browser.open(forum.absolute_url())
     >>> 'New title' in browser.contents
     True
     >>> 'Publish inline' in browser.contents
@@ -246,9 +229,10 @@ The original member should see all four conversations.
 
 However, another member can only see the published ones.
 
-    >>> utils.logoutThenLoginAs(self, browser, 'member2')
-    >>> browser.open(self.forum.absolute_url())
+    >>> browser.getLink('Log out').click()
+    >>> browser.login('member2', 'secret')
 
+    >>> browser.open(forum.absolute_url())
     >>> 'New title' in browser.contents
     True
     >>> 'Publish inline' in browser.contents
@@ -264,9 +248,10 @@ Add comment to own comment
 Now that we have a published comment, add a reply. Use the quick-reply field
 first.
 
-    >>> utils.logoutThenLoginAs(self, browser, 'member1')
-    >>> browser.open(conversation.absolute_url())
+    >>> browser.getLink('Log out').click()
+    >>> browser.login('member1', 'secret')
 
+    >>> browser.open(conversation.absolute_url())
     >>> browser.getControl(name='text').value = 'A quick reply'
     >>> browser.getControl(name='form.button.Post').click()
     >>> browser.url.startswith(conversation.absolute_url())
@@ -300,9 +285,10 @@ Submit and make sure we go back to the conversation
 Both of these comments are now pending. Check that they appear in the moderation
 queue and publish them.
 
-    >>> utils.logoutThenLoginAs(self, browser, 'reviewer1')
-    >>> browser.open(self.forum.absolute_url())
+    >>> browser.getLink('Log out').click()
+    >>> browser.login('reviewer1', 'secret')
 
+    >>> browser.open(forum.absolute_url())
     >>> browser.getLink('Moderate').click()
     >>> browser.getControl('Publish', index=0).click()
     >>> browser.getControl('Publish', index=0).click()
@@ -311,8 +297,10 @@ queue and publish them.
 
 Log back in as original member.
 
-    >>> utils.logoutThenLoginAs(self, browser, 'member1')
-    >>> browser.open(self.forum.absolute_url())
+    >>> browser.getLink('Log out').click()
+    >>> browser.login('member1', 'secret')
+
+    >>> browser.open(forum.absolute_url())
 
 Edit own comment
 ----------------
@@ -366,11 +354,12 @@ View other member's comment
 
 Other members can view published comments. First, log in.
 
-    >>> utils.logoutThenLoginAs(self, browser, 'member2')
+    >>> browser.getLink('Log out').click()
+    >>> browser.login('member2', 'secret')
 
 Find the forum, and go to the new post.
 
-    >>> browser.open(self.forum.absolute_url())
+    >>> browser.open(forum.absolute_url())
     >>> browser.getLink(url='/%s' % conversation.getId()).click()
 
 Add reply to other member's comment
@@ -412,9 +401,10 @@ moderation queue this time.
     >>> browser.contents
     '...Waiting for moderator...Waiting for moderator...'
 
-    >>> utils.logoutThenLoginAs(self, browser, 'reviewer1')
-    >>> browser.open(self.board.absolute_url())
+    >>> browser.getLink('Log out').click()
+    >>> browser.login('reviewer1', 'secret')
 
+    >>> browser.open(board.absolute_url())
     >>> browser.getLink('Moderate').click()
     >>> browser.getControl('Publish', index=0).click()
     >>> browser.getControl('Publish', index=0).click()
@@ -426,7 +416,7 @@ View as reviewer
 
 Find the forum, and go to the new post.
 
-    >>> browser.open(self.forum.absolute_url())
+    >>> browser.open(forum.absolute_url())
     >>> browser.getLink(url='/%s' % conversation.getId()).click()
 
 The reviewer cannot edit or delete any comments.
@@ -452,18 +442,20 @@ However, a reviewer can retract a comment:
 
 Logging in as another member, the retracted comment cannot be viewed:
 
-    >>> utils.logoutThenLoginAs(self, browser, 'member2')
+    >>> browser.getLink('Log out').click()
+    >>> browser.login('member2', 'secret')
 
-    >>> browser.open(self.forum.absolute_url())
+    >>> browser.open(forum.absolute_url())
     >>> browser.getLink(url='/%s' % conversation.getId()).click()
     >>> 'retracted' in browser.contents
     False
 
 However, the owner can see it, but cannot publish.
 
-    >>> utils.logoutThenLoginAs(self, browser, 'member1')
+    >>> browser.getLink('Log out').click()
+    >>> browser.login('member1', 'secret')
 
-    >>> browser.open(self.forum.absolute_url())
+    >>> browser.open(forum.absolute_url())
     >>> browser.getLink(url='/%s' % conversation.getId()).click()
     >>> 'retracted' in browser.contents
     True
@@ -474,9 +466,10 @@ However, the owner can see it, but cannot publish.
 
 The reviewer can re-publish the comment again:
 
-    >>> utils.logoutThenLoginAs(self, browser, 'reviewer1')
+    >>> browser.getLink('Log out').click()
+    >>> browser.login('reviewer1', 'secret')
 
-    >>> browser.open(self.forum.absolute_url())
+    >>> browser.open(forum.absolute_url())
     >>> browser.getLink(url='/%s' % conversation.getId()).click()
     >>> 'retracted' in browser.contents
     True
@@ -489,11 +482,12 @@ View as manager
 
 Log in as a manager.
 
-    >>> utils.logoutThenLoginAs(self, browser, 'manager1')
+    >>> browser.getLink('Log out').click()
+    >>> browser.login('manager1', 'secret')
 
 Find the forum, and go to the new post.
 
-    >>> browser.open(self.forum.absolute_url())
+    >>> browser.open(forum.absolute_url())
     >>> browser.getLink(url='/%s' % conversation.getId()).click()
 
 A manager can edit and delete comments, as well as apply workflow transitions.
@@ -531,8 +525,10 @@ Lock a conversation, and ensure that reply buttons do not appear.
 
 Verify that they do not appear as a regular member either.
 
-    >>> utils.logoutThenLoginAs(self, browser, 'member1')
-    >>> browser.open(self.forum.absolute_url())
+    >>> browser.getLink('Log out').click()
+    >>> browser.login('member1', 'secret')
+
+    >>> browser.open(forum.absolute_url())
     >>> browser.getLink(url='/%s' % conversation.getId()).click()
 
     >>> browser.getControl(name='form.button.Post')
@@ -546,7 +542,9 @@ Verify that they do not appear as a regular member either.
 
 Unlock again
 
-    >>> utils.logoutThenLoginAs(self, browser, 'manager1')
+    >>> browser.getLink('Log out').click()
+    >>> browser.login('manager1', 'secret')
+
     >>> browser.open(conversation.absolute_url())
     >>> browser.getLink('Activate').click()
 
@@ -554,9 +552,8 @@ View as anonymous
 -----------------
 
 Log out, and ensure the post can be viewed by anonymous.
-
-    >>> browser.open('%s/logout' % self.portal.absolute_url())
-    >>> browser.open(self.board.absolute_url())
+    >>> browser.getLink('Log out').click()
+    >>> browser.open(board.absolute_url())
     >>> browser.getLink('Forum one').click()
     >>> browser.getLink(url='/%s' % conversation.getId()).click()
     >>> browser.contents
@@ -600,7 +597,7 @@ The item is now up for moderation, but it is not visible to anonymous.
 
 Anonymous can start new threads, too:
 
-    >>> browser.open(self.forum.absolute_url())
+    >>> browser.open(forum.absolute_url())
     >>> browser.getControl('Start a new Conversation').click()
     >>> browser.url
     '.../add_conversation_form...'
@@ -619,7 +616,7 @@ should exist, but we should be able to view it because it is pending and we're
 not logged in.
 
     >>> browser.getControl(name='form.button.Post').click()
-    >>> browser.url.startswith(self.forum.absolute_url())
+    >>> browser.url.startswith(forum.absolute_url())
     True
     >>> browser.contents
     '...pending moderation...'
@@ -628,9 +625,9 @@ not logged in.
 
 Check that they appear in the moderation queue, and publish/reject.
 
-    >>> utils.logoutThenLoginAs(self, browser, 'reviewer1')
-    >>> browser.open(self.forum.absolute_url())
+    >>> browser.login('reviewer1', 'secret')
 
+    >>> browser.open(forum.absolute_url())
     >>> browser.getLink('Moderate').click()
     >>> 'Anonymous posting title' in browser.contents
     True
@@ -645,7 +642,7 @@ Check that they appear in the moderation queue, and publish/reject.
 
 The posts should now appear.
 
-    >>> browser.open(self.forum.absolute_url())
+    >>> browser.open(forum.absolute_url())
     >>> 'Anonymous posting title' in browser.contents
     True
     >>> browser.open(conversation.absolute_url())
@@ -654,14 +651,15 @@ The posts should now appear.
     >>> 'Anonymous full reply' in browser.contents
     True
 
-
 Deleting comments and conversations
 -----------------------------------
 
 A manager can delete comments:
 
-    >>> utils.logoutThenLoginAs(self, browser, 'manager1')
-    >>> browser.open(self.forum.absolute_url())
+    >>> browser.getLink('Log out').click()
+    >>> browser.login('manager1', 'secret')
+
+    >>> browser.open(forum.absolute_url())
     >>> browser.getLink(url='/%s' % conversation.getId()).click()
 
     >>> commentsBefore = len(conversation.getComments())
@@ -675,7 +673,7 @@ Deleting the last comment also deletes the entire thread
 
     >>> for i in range(conversation.getNumberOfComments()):
     ...     browser.getControl('Delete', index=0).click()
-    >>> browser.url.startswith(self.forum.absolute_url())
+    >>> browser.url.startswith(forum.absolute_url())
     True
     >>> browser.contents
     '...Conversation deleted...'
